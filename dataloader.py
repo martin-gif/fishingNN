@@ -16,6 +16,11 @@ class fishingDataLoader:
     def __files__(self):
         return self.file_list
 
+    def csv_path(self):
+        for file in self.file_list:
+            path = os.path.join(self.path, file)
+            yield path
+
     def loadAllTrainingData(self):
         files = self.file_list.copy()
         data = pd.DataFrame()
@@ -71,45 +76,60 @@ class fishingDataLoader:
                 result.append(df)
         return result
 
-    def genDatasetFromTrips(self, sample: int) -> list[list]:
-        n, k = divmod(sample, len(self.file_list))
-        # print(n, k)
+    def remove_rows_between_trips(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        clean rows where ship is not on trip so separation trips later on works better
+        :param df: Dataframe with multiple rows where ship is not on a trip
+        :return df: cleand Dataframe
+        """
+        columne_to_split = "distance_from_shore"
+        result = df.drop(
+            df[
+                (
+                    (df[columne_to_split].shift() == df[columne_to_split])
+                    & (df[columne_to_split] == 0)
+                )
+            ].index
+        )
+        return result
+
+    def genDatasetFromTrips(
+        self, min_length: int = 100, max_length: int = 10000
+    ) -> list[list]:
+
         columne_to_split = "distance_from_shore"
         if self.file_list:
             file_path = os.path.join(self.path, "pole_and_line.csv")
-            df = pd.read_csv(file_path)
-            group_by_mmsi = df.groupby(by="mmsi")
+            data = pd.read_csv(file_path)
+            group_by_mmsi = data.groupby(by="mmsi")
             print("unique mms's:", len(set(df["mmsi"])))
             # print((df["distance_from_port"] == 0).astype(int).sum(axis=0))
             # print(group_by_mmsi.size())
+
             list_trips = []
-            n = 0
             for shipname, ship in group_by_mmsi:
-                # print(ship.size)
-                # first split dataframe into trips, where each trip is between to distance_from_port == 0
-                # print(int(shipname), end=": ")
-                # print((ship["distance_from_port"] == 0).astype(int).sum(), end=" :")
-                ship = ship.drop(
-                    ship[
-                        (
-                            (ship[columne_to_split].shift() != ship[columne_to_split])
-                            & (ship[columne_to_split] == 0)
-                        )
-                    ].index
-                )
-                # print(ship.size, end=": ")
-                # print((ship["distance_from_port"] == 0).astype(int).sum())
-                # index_to_split = np.where(ship["distance_from_port"] == 0)[0] # gets all indize as a ndarray where condition is true
-                # print(index_to_split, index_to_split.size)
+                # remove disturbing rows and split dataset int trips
+                ship = self.remove_rows_between_trips(df=ship)
                 trips = np.split(ship, np.where(ship[columne_to_split] == 0)[0])
-                # print(len(trips[0]))
-                result_list = self.filter_len(trips, min=60)
-                # print(len(result_list))
+
+                # check if trip is long enough
+                result_list = self.filter_len(trips, min=min_length, max=max_length)
+
                 if len(result_list) > 0:
                     list_trips.append(result_list)
 
-                if len(list_trips) > 0:
-                    print(len(list_trips[n]))
-                    n += 1
-
         return list_trips
+
+
+if __name__ == "__main__":
+    loader = fishingDataLoader()
+    for path in loader.csv_path():
+        print(path)
+    d = {"distance_from_shore": [1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1]}
+    df = pd.DataFrame(data=d)
+    # print(df)
+    cleand_df = loader.remove_rows_between_trips(df=df)
+    print(cleand_df)
+    trips = np.split(cleand_df, np.where(cleand_df["distance_from_shore"] == 0)[0])
+    for trip in trips:
+        print(trip)
