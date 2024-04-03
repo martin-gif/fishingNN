@@ -4,6 +4,8 @@ import pandas as pd
 import tensorflow as tf
 import numpy as np
 from pandas.core.groupby import DataFrameGroupBy
+from sqlalchemy import create_engine
+from sqlalchemy_utils import database_exists, create_database
 
 
 class fishingDataLoader:
@@ -15,6 +17,12 @@ class fishingDataLoader:
 
     def __files__(self):
         return self.file_list
+
+    def gen_database(self):
+        self.engine = create_engine(url="sqlite:///data.db", echo=True)
+        if not database_exists(self.engine.url):
+            print("creat DB")
+            create_database(self.engine.url)
 
     def csv_path(self):
         for file in self.file_list:
@@ -102,7 +110,6 @@ class fishingDataLoader:
             file_path = os.path.join(self.path, "pole_and_line.csv")
             data = pd.read_csv(file_path)
             group_by_mmsi = data.groupby(by="mmsi")
-            print("unique mms's:", len(set(df["mmsi"])))
             # print((df["distance_from_port"] == 0).astype(int).sum(axis=0))
             # print(group_by_mmsi.size())
 
@@ -123,13 +130,15 @@ class fishingDataLoader:
 
 if __name__ == "__main__":
     loader = fishingDataLoader()
-    for path in loader.csv_path():
-        print(path)
+    # for path in loader.csv_path():
+    #     print(path)
+    loader.gen_database()
+
     d = {"distance_from_shore": [1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1]}
     df = pd.DataFrame(data=d)
     # print(df)
     cleand_df = loader.remove_rows_between_trips(df=df)
-    print(cleand_df)
+    # print(cleand_df)
     trips = np.split(cleand_df, np.where(cleand_df["distance_from_shore"] == 0)[0])
     for trip in trips:
         print(trip)

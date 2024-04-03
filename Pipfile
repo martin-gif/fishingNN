@@ -10,6 +10,8 @@ jupyter = "*"
 matplotlib = "*"
 scikit-learn = "*"
 geopandas = "*"
+sqlalchemy = "*"
+sqlalchemy-utils = "*"
 
 [dev-packages]
 

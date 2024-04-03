@@ -4,3 +4,4 @@ training
 logs/fit
 *.csv
 *.zip
+*.db
