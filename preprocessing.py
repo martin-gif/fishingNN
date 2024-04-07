@@ -3,5 +3,5 @@ import pandas as pd
 
 data = fishingDataLoader()
 
-data = data.genDatasetFromTrips(sample=6000)
+data.genDatasetFromTrips()
 # print(type(data))

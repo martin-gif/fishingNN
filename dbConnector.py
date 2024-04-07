@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
 
 
 class Shiptype(Base):
-    __tablename__ = "Ship-type"
+    __tablename__ = "ship_type"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30))
 
@@ -26,24 +26,21 @@ class Shiptype(Base):
 class Ship(Base):
     __tablename__ = "ship"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    mmsi: Mapped[int] = mapped_column()
-
-    def __repr__(self):
-        return f"User(id={self.id!r}, id={self.mmsi!r}"
+    name: Mapped[int] = mapped_column(primary_key=True)
 
 
 class Trip(Base):
     __tablename__ = "trip"
     id: Mapped[int] = mapped_column(primary_key=True)
-    shiptype: Mapped[int] = mapped_column(ForeignKey("Ship-type.id"))
-    shipid: Mapped[int] = mapped_column(ForeignKey("ship.id"))
+    ship_type_id: Mapped[int] = mapped_column(ForeignKey("ship_type.id"))
+    ship_mmsi: Mapped[int] = mapped_column(ForeignKey("ship.name"))
 
 
 class Data(Base):
     __tablename__ = "data"
 
     tripId: Mapped[int] = mapped_column(ForeignKey("trip.id"), primary_key=True)
+    index: Mapped[int] = mapped_column(primary_key=True)
     mmsi: Mapped[float]
     timestamp: Mapped[float]
     distance_from_shore: Mapped[float]

@@ -5,7 +5,10 @@ import tensorflow as tf
 import numpy as np
 from pandas.core.groupby import DataFrameGroupBy
 from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 from sqlalchemy_utils import database_exists, create_database
+from sqlalchemy.dialects.postgresql import insert
+from dbConnector import Base, Shiptype, Ship, Trip, Data
 
 
 class fishingDataLoader:
@@ -14,15 +17,17 @@ class fishingDataLoader:
         self.batch_size = batch_size
         self.file_list = [file for file in os.listdir(self.path) if ".csv" in file]
         self.label_dict = dict(zip(self.file_list, range(len(self.file_list))))
+        self.engine = create_engine(url="sqlite:///data.db", echo=False)
 
     def __files__(self):
         return self.file_list
 
     def gen_database(self):
-        self.engine = create_engine(url="sqlite:///data.db", echo=True)
-        if not database_exists(self.engine.url):
-            print("creat DB")
-            create_database(self.engine.url)
+        # if not database_exists(self.engine.url):
+        print("creat DB")
+        # TODO remove following line if db works
+        Base.metadata.drop_all(self.engine)  # only wile testing
+        Base.metadata.create_all(self.engine)
 
     def csv_path(self):
         for file in self.file_list:
@@ -101,31 +106,64 @@ class fishingDataLoader:
         )
         return result
 
+    def _upsert_into_db(self, entry: Base):
+        with Session(self.engine) as session:
+            session.add(entry)
+            session.commit()
+
     def genDatasetFromTrips(
         self, min_length: int = 100, max_length: int = 10000
-    ) -> list[list]:
-
+    ) -> None:
+        self.gen_database()
         columne_to_split = "distance_from_shore"
+        trip_id = 0
         if self.file_list:
-            file_path = os.path.join(self.path, "pole_and_line.csv")
-            data = pd.read_csv(file_path)
-            group_by_mmsi = data.groupby(by="mmsi")
-            # print((df["distance_from_port"] == 0).astype(int).sum(axis=0))
-            # print(group_by_mmsi.size())
+            for ship_type_id, path in enumerate(self.csv_path()):
+                if "pole_and_line" not in path:
+                    continue
 
-            list_trips = []
-            for shipname, ship in group_by_mmsi:
-                # remove disturbing rows and split dataset int trips
-                ship = self.remove_rows_between_trips(df=ship)
-                trips = np.split(ship, np.where(ship[columne_to_split] == 0)[0])
+                # generate ship entry and persist save it
+                file_basename = os.path.basename(path)
+                ship_type = os.path.splitext(file_basename)[0]
+                ship = Shiptype(id=ship_type_id, name=ship_type)
+                print(ship_type, ship_type_id)
+                self._upsert_into_db(ship)
 
-                # check if trip is long enough
-                result_list = self.filter_len(trips, min=min_length, max=max_length)
+                data = pd.read_csv(path)
+                group_by_mmsi = data.groupby(by="mmsi")
+                # print((df["distance_from_port"] == 0).astype(int).sum(axis=0))
+                # print(group_by_mmsi.size())
 
-                if len(result_list) > 0:
-                    list_trips.append(result_list)
+                list_trips = []
+                for shipname, ship in group_by_mmsi:
+                    # generate Ship entry and insert it into DB. Needed to make trip unique later
+                    shipname_as_int = int(shipname)
+                    current_ship = Ship(name=int(shipname_as_int))
+                    self._upsert_into_db(current_ship)
+                    # remove disturbing rows and split dataset int trips
+                    ship = self.remove_rows_between_trips(df=ship)
+                    trips = np.split(ship, np.where(ship[columne_to_split] == 0)[0])
 
-        return list_trips
+                    # check if trip is long enough
+                    result_list = self.filter_len(trips, min=min_length, max=max_length)
+                    len_result_list = len(result_list)
+
+                    if len_result_list > 0:
+                        # Safe trip with id in DB
+                        for trip_df in result_list:
+                            current_trip = Trip(
+                                id=trip_id,
+                                ship_type_id=ship_type_id,
+                                ship_mmsi=shipname_as_int,
+                            )
+                            self._upsert_into_db(current_trip)
+                            trip_id += 1
+
+                            assert isinstance(trip_df, pd.DataFrame)
+                            trip_df["tripid"] = trip_id
+                            trip_df.to_sql(
+                                name="data", con=self.engine, if_exists="append"
+                            )
 
 
 if __name__ == "__main__":
