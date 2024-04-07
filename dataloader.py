@@ -1,14 +1,14 @@
-import glob
 import os
-import pandas as pd
-import tensorflow as tf
+import warnings
+
 import numpy as np
-from pandas.core.groupby import DataFrameGroupBy
+import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy_utils import database_exists, create_database
-from sqlalchemy.dialects.postgresql import insert
-from dbConnector import Base, Shiptype, Ship, Trip, Data
+from sqlalchemy_utils import database_exists
+from tqdm import tqdm
+
+from dbConnector import Base, Shiptype, Ship, Trip
 
 
 class fishingDataLoader:
@@ -23,11 +23,11 @@ class fishingDataLoader:
         return self.file_list
 
     def gen_database(self):
-        # if not database_exists(self.engine.url):
-        print("creat DB")
-        # TODO remove following line if db works
-        Base.metadata.drop_all(self.engine)  # only wile testing
-        Base.metadata.create_all(self.engine)
+        if not database_exists(self.engine.url):
+            print("creat DB")
+            # TODO remove following line if db works
+            # Base.metadata.drop_all(self.engine)  # only wile testing
+            Base.metadata.create_all(self.engine)
 
     def csv_path(self):
         for file in self.file_list:
@@ -114,22 +114,28 @@ class fishingDataLoader:
     def genDatasetFromTrips(
         self, min_length: int = 100, max_length: int = 10000
     ) -> None:
+        warnings.simplefilter(
+            action="ignore", category=FutureWarning
+        )  # suppress Pandas Future warning
         self.gen_database()
         columne_to_split = "distance_from_shore"
         trip_id = 0
         if self.file_list:
-            for ship_type_id, path in enumerate(self.csv_path()):
-                if "pole_and_line" not in path:
-                    continue
+            for ship_type_id, path in tqdm(enumerate(self.csv_path())):
+                # used for test reasons
+                # if "pole_and_line" not in path:
+                #     continue
 
                 # generate ship entry and persist save it
                 file_basename = os.path.basename(path)
                 ship_type = os.path.splitext(file_basename)[0]
                 ship = Shiptype(id=ship_type_id, name=ship_type)
-                print(ship_type, ship_type_id)
+                # print(ship_type, ship_type_id)
                 self._upsert_into_db(ship)
 
+                # read data and remove rows containing Null value
                 data = pd.read_csv(path)
+                data = data.dropna()
                 group_by_mmsi = data.groupby(by="mmsi")
                 # print((df["distance_from_port"] == 0).astype(int).sum(axis=0))
                 # print(group_by_mmsi.size())
@@ -151,6 +157,7 @@ class fishingDataLoader:
                     if len_result_list > 0:
                         # Safe trip with id in DB
                         for trip_df in result_list:
+                            # print(trip_id)
                             current_trip = Trip(
                                 id=trip_id,
                                 ship_type_id=ship_type_id,

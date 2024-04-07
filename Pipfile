@@ -12,6 +12,8 @@ scikit-learn = "*"
 geopandas = "*"
 sqlalchemy = "*"
 sqlalchemy-utils = "*"
+tqdm = "*"
+black = "*"
 
 [dev-packages]
 
