@@ -3,7 +3,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Engine
 from sqlalchemy.orm import Session
 from sqlalchemy_utils import database_exists
 from tqdm import tqdm
@@ -12,72 +12,43 @@ from dbConnector import Base, Shiptype, Ship, Trip
 
 
 class fishingDataLoader:
-    def __init__(self, path="data/data", batch_size=64, *args, **kwargs):
+    def __init__(
+        self,
+        path="data/data",
+        batch_size=64,
+        input_engine: Engine = None,
+        *args,
+        **kwargs,
+    ):
         self.path = path
         self.batch_size = batch_size
         self.file_list = [file for file in os.listdir(self.path) if ".csv" in file]
         self.label_dict = dict(zip(self.file_list, range(len(self.file_list))))
-        self.engine = create_engine(url="sqlite:///data.db", echo=False)
+        if input_engine is None:
+            self.engine = create_engine(url="sqlite:///data/data.db", echo=False)
+        else:
+            self.engine = input_engine
 
     def __files__(self):
         return self.file_list
 
-    def gen_database(self):
+    def gen_SQL_db(self, min_length: int = 100, max_length: int = 10000) -> None:
+        """
+        this Method is used to generate a SQL Database if it not already exists
+        :return: None
+        """
         if not database_exists(self.engine.url):
-            print("creat DB")
-            # TODO remove following line if db works
-            # Base.metadata.drop_all(self.engine)  # only wile testing
             Base.metadata.create_all(self.engine)
+            self.genDatasetFromTrips(min_length=min_length, max_length=max_length)
+        else:
+            return
 
     def csv_path(self):
         for file in self.file_list:
             path = os.path.join(self.path, file)
             yield path
 
-    def loadAllTrainingData(self):
-        files = self.file_list.copy()
-        data = pd.DataFrame()
-        labels = []
-
-        if files:
-            for csv_file in files:
-                if csv_file == "unknown.csv":  # skip file with unknown labels
-                    continue
-
-                file_path = os.path.join(self.path, csv_file)
-                df = pd.read_csv(file_path)
-
-                df = df.drop(columns=["source"])
-                data = pd.concat([data, df])
-                labels.extend([self.label_dict[str(csv_file)]] * len(df))
-
-        data = data.assign(labels=labels)
-        print(data)
-        return data.reset_index(drop=True)
-
-    def genSmalerDataset(self, sample: int, folder):
-        n, k = divmod(sample, len(self.file_list))
-        print(n, k)
-        files = self.file_list.copy()
-        data = pd.DataFrame()
-        for i, csv_file in enumerate(files):
-            if csv_file == "unknown.csv":  # skip file with unknown labels
-                print("unknown")
-                continue
-
-            file_path = os.path.join(self.path, csv_file)
-            df = pd.read_csv(file_path)
-            df = df.drop(columns=["source"])
-            if i >= n:
-                df = df.iloc[: n + 1]
-            else:
-                df = df.iloc[:n]
-
-            data = pd.concat([data, df])
-        rows = len(data)
-        data.to_csv(os.path.join(folder, f"{rows}.csv"))
-
-    def filter_len(self, data_frame_iter: list, min: int = 0, max: int = 10000):
+    def _filter_len(self, data_frame_iter: list, min: int = 0, max: int = 10000):
         result = []
         for df in data_frame_iter:
             rows = len(df)
@@ -89,7 +60,7 @@ class fishingDataLoader:
                 result.append(df)
         return result
 
-    def remove_rows_between_trips(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _remove_rows_between_trips(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         clean rows where ship is not on trip so separation trips later on works better
         :param df: Dataframe with multiple rows where ship is not on a trip
@@ -117,7 +88,6 @@ class fishingDataLoader:
         warnings.simplefilter(
             action="ignore", category=FutureWarning
         )  # suppress Pandas Future warning
-        self.gen_database()
         columne_to_split = "distance_from_shore"
         trip_id = 0
         if self.file_list:
@@ -147,11 +117,13 @@ class fishingDataLoader:
                     current_ship = Ship(name=int(shipname_as_int))
                     self._upsert_into_db(current_ship)
                     # remove disturbing rows and split dataset int trips
-                    ship = self.remove_rows_between_trips(df=ship)
+                    ship = self._remove_rows_between_trips(df=ship)
                     trips = np.split(ship, np.where(ship[columne_to_split] == 0)[0])
 
                     # check if trip is long enough
-                    result_list = self.filter_len(trips, min=min_length, max=max_length)
+                    result_list = self._filter_len(
+                        trips, min=min_length, max=max_length
+                    )
                     len_result_list = len(result_list)
 
                     if len_result_list > 0:
@@ -177,12 +149,11 @@ if __name__ == "__main__":
     loader = fishingDataLoader()
     # for path in loader.csv_path():
     #     print(path)
-    loader.gen_database()
 
     d = {"distance_from_shore": [1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1]}
     df = pd.DataFrame(data=d)
     # print(df)
-    cleand_df = loader.remove_rows_between_trips(df=df)
+    cleand_df = loader._remove_rows_between_trips(df=df)
     # print(cleand_df)
     trips = np.split(cleand_df, np.where(cleand_df["distance_from_shore"] == 0)[0])
     for trip in trips:

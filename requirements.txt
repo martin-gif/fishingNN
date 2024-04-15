@@ -157,3 +157,9 @@ wheel==0.43.0; python_version >= '3.8'
 widgetsnbextension==4.0.10; python_version >= '3.7'
 wrapt==1.16.0; python_version >= '3.6'
 zipp==3.18.1; python_version < '3.10'
+
+pandas~=2.2.1
+tensorflow~=2.16.1
+numpy~=1.26.4
+SQLAlchemy~=2.0.29
+tqdm~=4.66.2
