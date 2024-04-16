@@ -55,8 +55,10 @@ def build_model():
 
     model = keras.Sequential(
         [
-            keras.layers.InputLayer(shape=(9,)),
-            keras.layers.Dense(6, activation=keras.activations.softmax, name="L2"),
+            # keras.layers.InputLayer(input_shape=(9,)),
+            keras.layers.Dense(
+                6, activation=keras.activations.softmax, input_shape=(9,), name="L2"
+            ),
             keras.layers.Dense(
                 6, activation=keras.activations.sigmoid, name="Output_layer"
             ),
@@ -89,6 +91,7 @@ if __name__ == "__main__":
     x = np.random.random((50, 9))
     y = np.random.randint(low=0, high=6, size=50)
     y = np.zeros((y.size, y.max() + 1))  # turn into one hot vector
-    # print(y)
-    # print(x)
+    print("datapoint", x[0])
+    print("lable", y[0])
     model.fit(x=x, y=y, batch_size=1, epochs=1)
+    print("predict", model.predict([x[0]]))

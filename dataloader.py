@@ -1,14 +1,16 @@
 import os
 import warnings
+import tensorflow as tf
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import create_engine, Engine
+from sqlalchemy import create_engine, Engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy_utils import database_exists
+from tensorflow.python.data.experimental.ops.readers import SqlDatasetV2
 from tqdm import tqdm
 
-from dbConnector import Base, Shiptype, Ship, Trip
+from dbConnector import Base, Shiptype, Ship, Trip, Data
 
 
 class fishingDataLoader:
@@ -147,14 +149,9 @@ class fishingDataLoader:
 
 if __name__ == "__main__":
     loader = fishingDataLoader()
-    # for path in loader.csv_path():
-    #     print(path)
-
     d = {"distance_from_shore": [1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1]}
     df = pd.DataFrame(data=d)
-    # print(df)
     cleand_df = loader._remove_rows_between_trips(df=df)
-    # print(cleand_df)
     trips = np.split(cleand_df, np.where(cleand_df["distance_from_shore"] == 0)[0])
     for trip in trips:
         print(trip)

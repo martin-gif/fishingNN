@@ -1,9 +1,10 @@
+import keras.utils
 import tensorflow as tf
 from sqlalchemy import create_engine
 from dataloader import fishingDataLoader
-from model.shipType import gen_compiled_ship_type_classifier_model
-import keras
-from keras.utils import FeatureSpace
+from dataset_read import get_tf_sql_dataset_all_typs
+from model.nn.shipType import gen_compiled_ship_type_classifier_model
+
 
 ENGINE = create_engine(url="sqlite:///data/data.db", echo=False)
 
@@ -28,66 +29,28 @@ def parse_sql_data(*vals):
 
 
 def train():
-    batch_size = 200
-    # get Dataset
-    dataset = tf.data.experimental.SqlDataset(
-        driver_name="sqlite",
-        data_source_name="data/data.db",
-        query="""
-            SELECT data.mmsi, data.timestamp, data.distance_from_shore, data.distance_from_port, data.speed, data.course, data.lat, data.lon, data.is_fishing, ship_type.id
-            FROM data
-            JOIN trip ON data.tripId = trip.id
-            JOIN ship_type ON trip.ship_type_id = ship_type.id
-            LIMIT 1000;
-        """,
-        output_types=(
-            tf.double,
-            tf.double,
-            tf.double,
-            tf.double,
-            tf.double,
-            tf.double,
-            tf.double,
-            tf.double,
-            tf.double,
-            tf.int8,
-        ),
-    )
-    dataset = dataset.shuffle(buffer_size=10000)
-    dataset = dataset.batch(20)
-
+    # get Dataset and preprocess it
+    dataset = get_tf_sql_dataset_all_typs(limit_each_class=10000)
+    dataset = dataset.shuffle(buffer_size=1000, seed=42)
+    dataset = dataset.batch(200)
     dataset = dataset.map(parse_sql_data)
-
-    print(next(iter(dataset)))
-
-    # for feature, lable in dataset:
-    #     print(feature)
-    #     print(lable)
-    #     break
-
-    # feature_space = FeatureSpace(
-    #     features={
-    #         "mmsi": FeatureSpace.float_normalized(),
-    #         "timestamp": FeatureSpace.float_normalized(),
-    #         "distance_from_shore": FeatureSpace.float_normalized(),
-    #         "distance_from_port": FeatureSpace.float_normalized(),
-    #         "speed": FeatureSpace.float_normalized(),
-    #         "course": FeatureSpace.float_normalized(),
-    #         "lat": FeatureSpace.float_normalized(),
-    #         "lon": FeatureSpace.float_normalized(),
-    #         # "id": FeatureSpace.float_normalized(),
-    #     }
-    # )
-    # feature_space.adapt(dataset)
+    ds_training, ds_val = keras.utils.split_dataset(dataset, left_size=0.8)
 
     # generate models
     ship_type_classifier = gen_compiled_ship_type_classifier_model()
 
+    for feature, lable in dataset:
+        print(feature.numpy())
+        # print("predict:", ship_type_classifier.predict(feature[0]))
+        print("lable", lable.numpy())
+        break
+
     # train models
-    ship_type_classifier.fit(dataset, epochs=10)
+    ship_type_classifier.fit(x=ds_training, epochs=10, validation_data=ds_val)
 
 
 if __name__ == "__main__":
+
     loader = fishingDataLoader(input_engine=ENGINE)
     loader.gen_SQL_db()
     train()
