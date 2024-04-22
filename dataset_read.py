@@ -3,6 +3,7 @@ from typing import Type, Optional
 import tensorflow as tf
 from tensorflow.python.data.experimental.ops.readers import SqlDatasetV2
 from tensorflow.python.data.ops.dataset_ops import DatasetV2
+import pandas as pd
 
 
 def get_tf_sql_dataset_all_typs(limit_each_class: int = 1000) -> SqlDatasetV2:
@@ -30,7 +31,7 @@ def get_tf_sql_dataset_by_shipType_id(
         driver_name="sqlite",
         data_source_name="data/data.db",
         query=f"""
-                SELECT data.mmsi, data.timestamp, data.distance_from_shore, data.distance_from_port, data.speed, data.course, data.lat, data.lon, data.is_fishing, ship_type.id
+                SELECT data.timestamp, data.distance_from_shore, data.distance_from_port, data.speed, data.course, data.lat, data.lon, data.is_fishing, ship_type.id
                 FROM data
                 JOIN trip ON data.tripId = trip.id
                 JOIN ship_type ON trip.ship_type_id = ship_type.id
@@ -46,8 +47,25 @@ def get_tf_sql_dataset_by_shipType_id(
             tf.double,
             tf.double,
             tf.double,
-            tf.double,
             tf.int8,
         ),
     )
     return dataset
+
+
+def get_mean_var(columns: list[str], con=None) -> pd.DataFrame:
+    if con is None:
+        raise ValueError("con darf nicht None sein")
+    df = pd.DataFrame()
+    for column_table in columns:
+        table, name = column_table.split(sep=".")
+
+        querry = f"""SELECT  avg({column_table}) as mean, SUM(({column_table}-(SELECT AVG({column_table}) FROM {table}))*
+                    ({column_table}-(SELECT AVG({column_table}) FROM {table})) ) / (COUNT({column_table})-1) AS var
+                    FROM {table}
+                """
+        tmp = pd.read_sql(sql=querry, con=con)
+        tmp["name"] = name
+        df = pd.concat([df, tmp], ignore_index=True)
+
+    return df
