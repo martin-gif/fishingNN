@@ -15,11 +15,6 @@ ENGINE = create_engine(url="sqlite:///data/data.db", echo=False)
 
 
 def parse_sql_data(*vals):
-    mean_var_df = gen_mean_var_Dataframe()
-    # print(mean_var_df)
-    mean_tensor = tf.convert_to_tensor(mean_var_df["mean"])
-    var_tensor = tf.convert_to_tensor(mean_var_df["var"])
-
     # features = {
     #     "timestamp": tf.convert_to_tensor(vals[1]),
     #     "distance_from_shore": tf.convert_to_tensor(vals[2]),
@@ -31,9 +26,6 @@ def parse_sql_data(*vals):
     #     "is_fishing": tf.convert_to_tensor(vals[8]),
     # }
     features = tf.convert_to_tensor(vals[:8])
-    # features = tf.nn.batch_normalization(
-    #     x=features, mean=mean_tensor, variance=var_tensor, offset=None, scale=None
-    # )
     features = tf.transpose(features)
 
     lable = tf.convert_to_tensor(vals[8])
@@ -41,6 +33,17 @@ def parse_sql_data(*vals):
     # lable = tf.transpose(lable)
     lable = tf.one_hot(lable, depth=7)
     return (features, lable)
+
+
+def print_conf_matrix(data: tf.data.Dataset, model: keras.Model):
+    for feature, lable in data:
+        # print(feature)
+        pred = model.predict([feature])
+        lab = lable.numpy()
+        pred = tf.argmax(pred, axis=-1).numpy()
+        lab = tf.argmax(lab, axis=-1).numpy()
+        print(confusion_matrix(y_true=lab, y_pred=pred))
+        break
 
 
 def train():
@@ -56,30 +59,15 @@ def train():
     ds_training, ds_val = keras.utils.split_dataset(dataset, left_size=0.8)
 
     # generate models
-    ship_type_classifier = gen_compiled_ship_type_classifier_model()
+    model_list = [gen_compiled_ship_type_classifier_model()]
 
-    for feature, lable in dataset:
-        # print(feature)
-        pred = ship_type_classifier.predict([feature])
-        lab = lable.numpy()
-        pred = tf.argmax(pred, axis=-1).numpy()
-        lab = tf.argmax(lab, axis=-1).numpy()
-        print(confusion_matrix(y_true=lab, y_pred=pred))
-        break
+    for model in model_list:
+        print_conf_matrix(data=dataset, model=model)
 
-    # train models
-    ship_type_classifier.fit(
-        x=ds_training, epochs=20, validation_data=ds_val, verbose=2
-    )
+        # train models
+        model.fit(x=ds_training, epochs=20, validation_data=ds_val, verbose=2)
 
-    for feature, lable in dataset:
-        # print(feature)
-        pred = ship_type_classifier.predict([feature])
-        lab = lable.numpy()
-        pred = tf.argmax(pred, axis=-1).numpy()
-        lab = tf.argmax(lab, axis=-1).numpy()
-        print(confusion_matrix(y_true=lab, y_pred=pred))
-        break
+        print_conf_matrix(data=dataset, model=model)
 
 
 def gen_mean_var_Dataframe():
