@@ -57,11 +57,10 @@ def build_model():
         [
             keras.layers.InputLayer(input_shape=(8,)),
             keras.layers.BatchNormalization(),
+            keras.layers.Dense(10, activation=keras.activations.softmax, name="L1"),
+            keras.layers.BatchNormalization(),
             keras.layers.Dense(
-                10, activation=keras.activations.softmax, input_shape=(8,), name="L2"
-            ),
-            keras.layers.Dense(
-                6, activation=keras.activations.sigmoid, name="Output_layer"
+                7, activation=keras.activations.sigmoid, name="Output_layer"
             ),
         ]
     )
@@ -75,8 +74,8 @@ def gen_compiled_ship_type_classifier_model() -> keras.Model:
     # model.build((None, 9))
 
     model.compile(
-        optimizer=keras.optimizers.Adam(),
-        loss=keras.losses.BinaryCrossentropy(),
+        optimizer=keras.optimizers.Adam(learning_rate=0.0001),
+        loss=keras.losses.CategoricalCrossentropy(),
         metrics=[
             "accuracy",
             keras.metrics.Recall(name="Recall"),

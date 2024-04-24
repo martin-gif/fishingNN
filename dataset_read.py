@@ -9,7 +9,7 @@ import pandas as pd
 def get_tf_sql_dataset_all_typs(limit_each_class: int = 1000) -> SqlDatasetV2:
     result_dataset = None
 
-    for id in range(6):
+    for id in range(7):
         if id == 3:  # use because id 3 is dataset with unknown ids
             continue
         data = get_tf_sql_dataset_by_shipType_id(

@@ -35,15 +35,21 @@ def parse_sql_data(*vals):
     #     x=features, mean=mean_tensor, variance=var_tensor, offset=None, scale=None
     # )
     features = tf.transpose(features)
-    lable = tf.one_hot(vals[8], depth=6)
+
+    lable = tf.convert_to_tensor(vals[8])
+    print(vals[8])
+    # lable = tf.transpose(lable)
+    lable = tf.one_hot(lable, depth=7)
     return (features, lable)
 
 
 def train():
     # get Dataset and preprocess it
-    raw_data = get_tf_sql_dataset_all_typs(limit_each_class=10000)
-    dataset = raw_data.shuffle(buffer_size=1000, seed=42)
-    dataset = dataset.batch(2)
+    points_per_class = 3000
+    NUM_CLASSES = 6
+    raw_data = get_tf_sql_dataset_all_typs(limit_each_class=points_per_class)
+    dataset = raw_data.shuffle(buffer_size=points_per_class * NUM_CLASSES, seed=42)
+    dataset = dataset.batch(10)
     dataset = dataset.map(parse_sql_data)
 
     # print(next(iter(dataset)))
@@ -53,21 +59,25 @@ def train():
     ship_type_classifier = gen_compiled_ship_type_classifier_model()
 
     for feature, lable in dataset:
+        # print(feature)
         pred = ship_type_classifier.predict([feature])
         lab = lable.numpy()
-        print(tf.argmax(pred))
-        print(lab)
-        # print(confusion_matrix(y_true=lab, y_pred=pred))
+        pred = tf.argmax(pred, axis=-1).numpy()
+        lab = tf.argmax(lab, axis=-1).numpy()
+        print(confusion_matrix(y_true=lab, y_pred=pred))
         break
 
     # train models
-    # ship_type_classifier.fit(
-    #     x=ds_training, epochs=10, validation_data=ds_val, verbose=2
-    # )
+    ship_type_classifier.fit(
+        x=ds_training, epochs=20, validation_data=ds_val, verbose=2
+    )
 
     for feature, lable in dataset:
+        # print(feature)
         pred = ship_type_classifier.predict([feature])
         lab = lable.numpy()
+        pred = tf.argmax(pred, axis=-1).numpy()
+        lab = tf.argmax(lab, axis=-1).numpy()
         print(confusion_matrix(y_true=lab, y_pred=pred))
         break
 
