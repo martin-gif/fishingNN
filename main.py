@@ -31,6 +31,8 @@ def parse_sql_data(*vals):
         "is_fishing": tf.convert_to_tensor(vals[7]),
         "lable": tf.convert_to_tensor(vals[8]),
     }
+    # lable = tf.convert_to_tensor(vals[8])
+    # lable = tf.one_hot(indices=lable, depth=7)
     return features
 
 
@@ -44,14 +46,18 @@ def get_FeatureSpace(dataset: tf.data.Dataset) -> keras.utils.FeatureSpace:
     else:
         features = FeatureSpace(
             features={
-                "timestamp": FeatureSpace.float_normalized(),
-                "distance_from_shore": FeatureSpace.float_normalized(),
-                "distance_from_port": FeatureSpace.float_normalized(),
-                "speed": FeatureSpace.float_normalized(),
-                "course": FeatureSpace.float_normalized(),
-                "lat": FeatureSpace.float_normalized(),
-                "lon": FeatureSpace.float_normalized(),
-                "is_fishing": FeatureSpace.float_normalized(),
+                "timestamp": FeatureSpace.float_rescaled(scale=1.0 / 1480032000),
+                "distance_from_shore": FeatureSpace.float_rescaled(
+                    scale=1.0 / 4430996.5
+                ),
+                "distance_from_port": FeatureSpace.float_rescaled(
+                    scale=1.0 / 12452204.0
+                ),
+                "speed": FeatureSpace.float_rescaled(scale=1.0 / 103),
+                "course": FeatureSpace.float_rescaled(scale=1.0 / 511),
+                "lat": FeatureSpace.float_rescaled(scale=1.0 / 360, offset=0.5),
+                "lon": FeatureSpace.float_rescaled(scale=1.0 / 360, offset=0.5),
+                "is_fishing": FeatureSpace.float_rescaled(scale=1.0 / -1),
                 "lable": FeatureSpace.integer_categorical(),
             },
             output_mode="dict",
@@ -84,37 +90,27 @@ def train():
 
     dataset = get_tf_sql_dataset_all_typs(limit_each_class=total_points_per_class)
     dataset = dataset.map(parse_sql_data)
-    dataset = dataset.batch(points_per_trip)
 
     # Get adapted feature Space
     feature_space = get_FeatureSpace(dataset=dataset)
-    dataset = dataset.map(feature_space)
+    dataset = dataset.map(lambda x: (feature_space(x)))  # normalize features
 
-    # print(next(iter(dataset)))
+    dataset = dataset.batch(points_per_trip)
     dataset = dataset.shuffle(buffer_size=total_points_per_class * NUM_CLASSES, seed=42)
     dataset = dataset.batch(trips_per_batch)
 
     print(next(iter(dataset)))
-    # print(next(iter(dataset)))
-    # ds_training, ds_val = keras.utils.split_dataset(dataset, left_size=0.8)
 
     # generate models
     model_list = [
-        # gen_compiled_ship_type_classifier_model()
-        gen_compiled_LSTM_model()
+        gen_compiled_ship_type_classifier_model()
+        # gen_compiled_LSTM_model()
     ]
 
+    callback = keras.callbacks.EarlyStopping(monitor="loss", patience=3)
+
     for model in model_list:
-        # print_conf_matrix(data=dataset, model=model)
-
-        # train models
-        model.fit(x=dataset, epochs=20, verbose=1)
-
-        # print_conf_matrix(data=dataset, model=model)
-    # for feature, lable in dataset:
-    #     print(model.predict(feature))
-    #     print(lable)
-    #     break
+        model.fit(x=dataset, epochs=20, verbose=1, callbacks=[callback])
 
     return model_list, dataset
 

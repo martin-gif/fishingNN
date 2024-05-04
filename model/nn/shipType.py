@@ -55,7 +55,7 @@ def build_model():
 
     model = keras.Sequential(
         [
-            keras.layers.InputLayer(input_shape=(8,)),
+            keras.layers.InputLayer(input_shape=(4, 8)),
             keras.layers.BatchNormalization(),
             keras.layers.Dense(10, activation=keras.activations.softmax, name="L1"),
             keras.layers.BatchNormalization(),
