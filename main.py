@@ -1,82 +1,19 @@
 import os.path
-import sys
-from typing import List
 
 import keras.utils
-import numpy as np
 import pandas as pd
-import tensorflow as tf
-from keras.utils import FeatureSpace
 from sqlalchemy import create_engine
 from dataloader import fishingDataLoader
-from dataset_read import get_tf_sql_dataset_all_typs, get_mean_var
-from sklearn.metrics import confusion_matrix
+from dataset_read import (
+    get_mean_var,
+    get_dataset_generator,
+)
 
 from model.nn.shipType import gen_compiled_ship_type_classifier_model
 from model.nn.trajectoryPredict import gen_compiled_LSTM_model
-
+from src.utils import remove_entry_and_to_list, transform_dataset_dict_to_list_with_X_Y
 
 ENGINE = create_engine(url="sqlite:///data/data.db", echo=False)
-
-
-def parse_sql_data(*vals):
-    features = {
-        "timestamp": tf.convert_to_tensor(vals[0]),
-        "distance_from_shore": tf.convert_to_tensor(vals[1]),
-        "distance_from_port": tf.convert_to_tensor(vals[2]),
-        "speed": tf.convert_to_tensor(vals[3]),
-        "course": tf.convert_to_tensor(vals[4]),
-        "lat": tf.convert_to_tensor(vals[5]),
-        "lon": tf.convert_to_tensor(vals[6]),
-        "is_fishing": tf.convert_to_tensor(vals[7]),
-        "lable": tf.convert_to_tensor(vals[8]),
-    }
-    # lable = tf.convert_to_tensor(vals[8])
-    # lable = tf.one_hot(indices=lable, depth=7)
-    return features
-
-
-def get_FeatureSpace(dataset: tf.data.Dataset) -> keras.utils.FeatureSpace:
-    path = "data/featurespace.keras"
-    if os.path.isfile(path):
-        reloaded_feature_space = keras.models.load_model(path, compile=True)
-        # print((reloaded_feature_space.get_inputs()))
-        reloaded_feature_space.get_inputs()  # I don't know why but this is need for the loaded model to work
-        return reloaded_feature_space
-    else:
-        features = FeatureSpace(
-            features={
-                "timestamp": FeatureSpace.float_rescaled(scale=1.0 / 1480032000),
-                "distance_from_shore": FeatureSpace.float_rescaled(
-                    scale=1.0 / 4430996.5
-                ),
-                "distance_from_port": FeatureSpace.float_rescaled(
-                    scale=1.0 / 12452204.0
-                ),
-                "speed": FeatureSpace.float_rescaled(scale=1.0 / 103),
-                "course": FeatureSpace.float_rescaled(scale=1.0 / 511),
-                "lat": FeatureSpace.float_rescaled(scale=1.0 / 360, offset=0.5),
-                "lon": FeatureSpace.float_rescaled(scale=1.0 / 360, offset=0.5),
-                "is_fishing": FeatureSpace.float_rescaled(scale=1.0 / -1),
-                "lable": FeatureSpace.integer_categorical(),
-            },
-            output_mode="dict",
-        )
-        features.adapt(dataset)
-        features.save(path)
-        # print(features)
-        return features
-
-
-def print_conf_matrix(data: tf.data.Dataset, model: keras.Model):
-    for feature, lable in data:
-        # print(feature)
-        pred = model.predict([feature])
-        lab = lable.numpy()
-        pred = tf.argmax(pred, axis=-1).numpy()
-        lab = tf.argmax(lab, axis=-1).numpy()
-        print(confusion_matrix(y_true=lab, y_pred=pred))
-        break
 
 
 def train():
@@ -85,34 +22,33 @@ def train():
     trips_per_batch = 4
     batches_per_class = 500
 
-    total_points_per_class = points_per_trip * trips_per_batch * batches_per_class
-    NUM_CLASSES = 6
+    dataset = get_dataset_generator(points_per_trip, trips_per_batch, batches_per_class)
 
-    dataset = get_tf_sql_dataset_all_typs(limit_each_class=total_points_per_class)
-    dataset = dataset.map(parse_sql_data)
+    # print(next(iter(dataset)), "\n\n\n")
+    callback = keras.callbacks.EarlyStopping(monitor="loss", patience=3, min_delta=0.01)
 
-    # Get adapted feature Space
-    feature_space = get_FeatureSpace(dataset=dataset)
-    dataset = dataset.map(lambda x: (feature_space(x)))  # normalize features
+    # Model 1: used to classify ship type based on a trip
+    ship_type_classifier = gen_compiled_ship_type_classifier_model()
+    x = dataset.map(
+        lambda x: transform_dataset_dict_to_list_with_X_Y(
+            dictonary=x, lable="lable", reduce=False
+        )
+    )
+    # x = x.prefetch(tf.data.AUTOTUNE)
+    # ship_type_classifier.fit(x=x, epochs=20, verbose=1, callbacks=[callback])
 
-    dataset = dataset.batch(points_per_trip)
-    dataset = dataset.shuffle(buffer_size=total_points_per_class * NUM_CLASSES, seed=42)
-    dataset = dataset.batch(trips_per_batch)
+    # Model 2: used to reconstruct missing AIS Data based on a trip
+    reproduction_lstm = gen_compiled_LSTM_model()
+    x_2 = dataset.map(
+        lambda x: remove_entry_and_to_list(x, key_list=["lon", "lat"], exclude=False)
+    )
+    x_2 = x_2.map(lambda x: (x[:, : points_per_trip - 1], x[:, points_per_trip - 1 :]))
+    # print(next(iter(x_2))[1])
+    reproduction_lstm.fit(x=x_2, epochs=20, callbacks=[callback])
 
-    print(next(iter(dataset)))
+    model_list = [ship_type_classifier, reproduction_lstm]
 
-    # generate models
-    model_list = [
-        gen_compiled_ship_type_classifier_model()
-        # gen_compiled_LSTM_model()
-    ]
-
-    callback = keras.callbacks.EarlyStopping(monitor="loss", patience=3)
-
-    for model in model_list:
-        model.fit(x=dataset, epochs=20, verbose=1, callbacks=[callback])
-
-    return model_list, dataset
+    return model_list, x
 
 
 def gen_mean_var_Dataframe():

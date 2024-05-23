@@ -6,12 +6,12 @@ from keras import layers
 def build_model():
     model = keras.Sequential(
         layers=[
-            keras.layers.InputLayer(shape=(4, 8)),
+            keras.layers.InputLayer(shape=(4, 2)),
             keras.layers.LSTM(units=5, name="LSTM_Layer"),
             keras.layers.Dense(
-                units=8, activation=keras.activations.sigmoid, name="output_Layer"
+                units=2, activation=keras.activations.sigmoid, name="output_Layer"
             ),
-            keras.layers.Reshape(target_shape=(1, 8)),
+            # keras.layers.Reshape(target_shape=(2,)),
         ],
         name="LSTM_Model",
     )

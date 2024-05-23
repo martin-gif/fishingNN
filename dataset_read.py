@@ -5,6 +5,28 @@ from tensorflow.python.data.experimental.ops.readers import SqlDatasetV2
 from tensorflow.python.data.ops.dataset_ops import DatasetV2
 import pandas as pd
 
+from src.utils import get_FeatureSpace, parse_sql_data
+
+
+def get_dataset_generator(
+    points_per_trip: int = 5, trips_per_batch: int = 4, batches_per_class: int = 500
+) -> DatasetV2:
+    total_points_per_class = points_per_trip * trips_per_batch * batches_per_class
+    NUM_CLASSES = 6
+
+    dataset = get_tf_sql_dataset_all_typs(limit_each_class=total_points_per_class)
+    dataset = dataset.map(parse_sql_data)
+
+    # Get adapted feature Space
+    feature_space = get_FeatureSpace(dataset=dataset)
+    dataset = dataset.map(lambda x: (feature_space(x)))  # normalize features
+
+    dataset = dataset.batch(points_per_trip)
+    dataset = dataset.shuffle(buffer_size=total_points_per_class * NUM_CLASSES, seed=42)
+    dataset = dataset.batch(trips_per_batch)
+
+    return dataset
+
 
 def get_tf_sql_dataset_all_typs(limit_each_class: int = 1000) -> SqlDatasetV2:
     result_dataset = None
