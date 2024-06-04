@@ -3,6 +3,7 @@ import os
 import keras.api.models
 import keras.api.utils
 import tensorflow as tf
+from sqlalchemy import create_engine
 from tf_keras.src.utils import FeatureSpace
 
 
@@ -55,7 +56,7 @@ def transform_dataset_dict_to_list_with_X_Y(
 ):
     """
 
-    :param dictonary: Data dictionary
+    :param dictionary: Data dictionary
     :param lable: Dictionary key used to split the dataset
     :param reduce: if True only takes the first row of each lable entry
     :return:
@@ -77,7 +78,7 @@ def transform_dataset_dict_to_list_with_X_Y(
 
 
 def get_FeatureSpace(dataset: tf.data.Dataset) -> keras.utils.FeatureSpace:
-    path = "data/featurespace.keras"
+    path = "Anonymized_AIS_training_data/featurespace.keras"
     if os.path.isfile(path):
         reloaded_feature_space = keras.models.load_model(path, compile=True)
         # print((reloaded_feature_space.get_inputs()))

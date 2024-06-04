@@ -51,25 +51,29 @@ class ClassifyShipType(keras.Model):
         return keras.Model(inputs=x, outputs=self.call(x))
 
 
-def build_model():
+def build_model(input_dim, output_dim):
 
     model = keras.Sequential(
         [
-            keras.layers.InputLayer(input_shape=(4, 8)),
+            keras.layers.InputLayer(input_shape=(input_dim,)),
             keras.layers.BatchNormalization(),
             keras.layers.Dense(10, activation=keras.activations.relu, name="L1"),
             keras.layers.BatchNormalization(),
             keras.layers.Dense(
-                7, activation=keras.activations.sigmoid, name="Output_layer"
+                units=output_dim,
+                activation=keras.activations.sigmoid,
+                name="Output_layer",
             ),
         ]
     )
     return model
 
 
-def gen_compiled_ship_type_classifier_model() -> keras.Model:
+def gen_compiled_ship_type_classifier_model(
+    input_dim: int = 10, output_dim: int = 5
+) -> keras.Model:
     # model = ClassifyShipType()
-    model = build_model()
+    model = build_model(input_dim=input_dim, output_dim=output_dim)
 
     # model.build((None, 9))
 

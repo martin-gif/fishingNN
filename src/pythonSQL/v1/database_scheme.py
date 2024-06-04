@@ -37,7 +37,7 @@ class Trip(Base):
 
 
 class Data(Base):
-    __tablename__ = "data"
+    __tablename__ = "Anonymized_AIS_training_data"
 
     tripId: Mapped[int] = mapped_column(ForeignKey("trip.id"), primary_key=True)
     index: Mapped[int] = mapped_column(primary_key=True)

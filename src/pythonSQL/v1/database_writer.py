@@ -10,13 +10,13 @@ from sqlalchemy_utils import database_exists
 from tensorflow.python.data.experimental.ops.readers import SqlDatasetV2
 from tqdm import tqdm
 
-from dbConnector import Base, Shiptype, Ship, Trip, Data
+from src.pythonSQL.v1.database_scheme import Base, Shiptype, Ship, Trip, Data
 
 
 class fishingDataLoader:
     def __init__(
         self,
-        path="data/data",
+        path="data/Anonymized_AIS_training_data",
         batch_size=64,
         input_engine: Engine = None,
         *args,
@@ -27,7 +27,9 @@ class fishingDataLoader:
         self.file_list = [file for file in os.listdir(self.path) if ".csv" in file]
         self.label_dict = dict(zip(self.file_list, range(len(self.file_list))))
         if input_engine is None:
-            self.engine = create_engine(url="sqlite:///data/data.db", echo=False)
+            self.engine = create_engine(
+                url="sqlite:///data/Anonymized_AIS_training_data.db", echo=False
+            )
         else:
             self.engine = input_engine
 
@@ -105,7 +107,7 @@ class fishingDataLoader:
                 # print(ship_type, ship_type_id)
                 self._upsert_into_db(ship)
 
-                # read data and remove rows containing Null value
+                # read Anonymized_AIS_training_data and remove rows containing Null value
                 data = pd.read_csv(path)
                 data = data.dropna()
                 group_by_mmsi = data.groupby(by="mmsi")
@@ -143,7 +145,9 @@ class fishingDataLoader:
                             assert isinstance(trip_df, pd.DataFrame)
                             trip_df["tripid"] = trip_id
                             trip_df.to_sql(
-                                name="data", con=self.engine, if_exists="append"
+                                name="Anonymized_AIS_training_data",
+                                con=self.engine,
+                                if_exists="append",
                             )
 
 
