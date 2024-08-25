@@ -19,11 +19,15 @@ def gen_database_v2():
     df_model_labeld = pd.read_csv(
         f"{path_root}data/slavery_in_fisheries/s4_final_model_predictions.csv"
     )
+    df_fishing_vessel_v2 = pd.read_csv(
+        f"{path_root}data/Fishing_Effort/fishing-vessels-v2.csv"
+    )
 
     df_carrier_loitering.to_sql(name="carrier_loitering", con=connection)
     df_bunker_loitering.to_sql(name="bunker_loitering", con=connection)
     df_model_unlabeld.to_sql(name="model_unlabeld", con=connection)
     df_model_labeld.to_sql(name="model_labeld", con=connection)
+    df_fishing_vessel_v2.to_sql(name="fishing_vessel_v2", con=connection)
 
 
 if __name__ == "__main__":

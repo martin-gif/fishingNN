@@ -113,7 +113,7 @@ def baseSQL() -> str:
             LEFT JOIN model_unlabeld as unlabeld
                USING (hours, fishing_hours, average_daily_fishing_hours,
                       fishing_hours_foreign_eez, fishing_hours_high_seas, distance_traveled_km)
-            GROUP BY unlabeld.mmsi, labeld.Prediction
+            GROUP BY unlabeld.mmsi --, labeld.Prediction
         ),
         mmsi_pred_grouped as (
             SELECT a.*

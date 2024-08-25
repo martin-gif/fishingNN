@@ -16,6 +16,7 @@ tqdm = "*"
 black = "*"
 statsmodels = "*"
 xlrd = "*"
+seaborn = "*"
 
 [dev-packages]
 
