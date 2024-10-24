@@ -7,41 +7,32 @@ from sklearn.tree import DecisionTreeClassifier
 
 
 def getAllModels():
-    list_model_param = [
-        getLogisticRegressionModell(),
-        getGaussianMixtureModell(),
-        getSvcModell(),
-        getDecisionTreeModell(),
-        getRandeomForestModell(),
-    ]
+    list_model_param = np.array(
+        [
+            getLogisticRegressionModell(),
+            getSvcModell(),
+            getDecisionTreeModell(),
+            getRandeomForestModell(),
+        ]
+    )
 
-    list_model, list_params = np.split(np.array(list_model_param), 2, axis=1)
+    list_model, list_params = np.split(list_model_param, 2, axis=1)
     return list_model.flatten(), list_params.flatten()
 
 
 def getLogisticRegressionModell():
     log_reg = LogisticRegression()
     log_reg_params = {
-        "C": list(np.arange(0.001, 10, 0.1)),
-        "penalty": ["l2"],  # , "elasticnet"
+        "C": list(np.arange(0.1, 5, 0.1)),
     }
     return log_reg, log_reg_params
 
 
-def getGaussianMixtureModell():
-    gmm = GaussianMixture(n_components=2)
-    gmm_params = {
-        "init_params": ["kmeans", "k-means++", "random"],
-        "covariance_type": ["tied", "diag", "full"],
-    }
-    return gmm, gmm_params
-
-
 def getSvcModell():
-    svm = SVC(probability=True)
+    svm = SVC()
     svm_params = {
-        "C": list(np.arange(0.0005, 0.01, 0.005)),
-        "degree": list(range(2, 5, 1)),
+        "C": list(np.arange(0.0001, 1, 0.02)),
+        "gamma": list(np.arange(0.0001, 1, 0.02)),
         "kernel": ["linear", "rbf"],
     }
     return svm, svm_params

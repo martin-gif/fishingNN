@@ -17,6 +17,7 @@ black = "*"
 statsmodels = "*"
 xlrd = "*"
 seaborn = "*"
+imbalanced-learn = "*"
 
 [dev-packages]
 
